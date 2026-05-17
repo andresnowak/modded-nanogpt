@@ -184,7 +184,7 @@ def zeropower_via_newtonschulz5(G: Tensor) -> Tensor:
         X = X.mT
     return X
 
-@torch.compile(dynamic=False, fullgraph=True)
+@torch.compile(dynamic=True)
 def specmuon_reconstruct(U, S, Vh, r, sqrt_loss, lr, eps: float, sav_smooth: float, top_k: int):
     """Build SpecMuon update direction O and update SAV state r in-place."""
     k_act = min(top_k, S.shape[-1])
@@ -206,15 +206,14 @@ def specmuon_reconstruct(U, S, Vh, r, sqrt_loss, lr, eps: float, sav_smooth: flo
     chi = ((sqrt_loss - T.sqrt()) / denom).clamp(0.0, 1.0)
     r[:k_act].copy_(chi * r_new + (1.0 - chi) * sqrt_loss)
 
-    # SpecMuon Algorithm 1 line 22: use remaining singular values.
-    # If you want matrix-sign/Muon behavior instead, remove the S_rest factor.
+    # SpecMuon Algorithm 1 line 22: Use Muon for the reamining update directions
     if k_act < S.shape[-1]:
-        S_rest = S[k_act:]
-        O.add_((U[:, k_act:] * S_rest[None, :].type_as(U)) @ Vh[k_act:, :])
+        # S_rest = S[k_act:]
+        O.add_(U[:, k_act:] @ Vh[k_act:, :])
 
     return O
 
-def specmuon_update(grad, momentum, r, loss, lr, mu=0.95, top_k=8, sav_smooth=0.2, eps=1e-8):
+def specmuon_update(grad, momentum, r, loss, lr, mu=0.9, top_k=8, sav_smooth=0.2, eps=1e-8, raw_grad=False):
     """SpecMuon update from https://arxiv.org/abs/2602.16167.
 
     Order differs from the original Muon helper: SVD/SAV constructs O from the raw
@@ -223,17 +222,29 @@ def specmuon_update(grad, momentum, r, loss, lr, mu=0.95, top_k=8, sav_smooth=0.
     grad = grad.float()
     sqrt_loss = loss.detach().float().sqrt()
 
-    G_hat = grad / (torch.linalg.norm(grad) + eps)
+    # Nesterov momentum
+    if raw_grad:
+        update = grad
+    else:
+        momentum.lerp_(grad, 1 - mu)
+        update = grad.lerp_(momentum, mu)
+
+    G_hat = update / (update.norm(dim=(-2, -1), keepdim=True) + eps)
     U, S, Vh = torch.linalg.svd(G_hat, full_matrices=False, driver="gesvd")
 
     # Keep singular values in fp32 for SAV scalar math; use bf16 factors for the reconstruction matmuls.
     O = specmuon_reconstruct(U.bfloat16(), S, Vh.bfloat16(), r, sqrt_loss, lr, eps, sav_smooth, top_k)
 
-    # Preserve the simple track's shape-scaling heuristic from the original Muon baseline.
+    # Shape-scaling
     O = O.float().mul_(max(1, grad.size(-2) / grad.size(-1))**0.5)
 
-    momentum.mul_(mu).add_(O)
-    return momentum
+    # Original method in specmuon does update in raw grad and then adds the momentum
+    if raw_grad:
+        momentum.mul_(mu).add_(O)
+        update = momentum
+    else:
+        update = O
+    return update
 
 class Muon(torch.optim.Optimizer):
     def __init__(self, params, lr=0.02, weight_decay=0, mu=0.95, top_k=8, sav_smooth=0.2, eps=1e-8):
