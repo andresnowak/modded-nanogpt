@@ -1,0 +1,1529 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Modded-NanoGPT — Visual Codebase Pipeline</title>
+  <style>
+    :root{
+      --bg:#07111f;
+      --bg2:#0b1730;
+      --panel:#0f1b34cc;
+      --panel-solid:#12203d;
+      --panel-2:#16284c;
+      --text:#ecf3ff;
+      --muted:#aebee0;
+      --line:#284472;
+      --cyan:#69d2ff;
+      --blue:#7ca8ff;
+      --green:#82f7c3;
+      --pink:#ff86d1;
+      --orange:#ffbf69;
+      --purple:#b89cff;
+      --red:#ff7d7d;
+      --shadow:0 18px 40px rgba(0,0,0,.32);
+      --radius:20px;
+      --radius-sm:14px;
+      --max:1380px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * { box-sizing:border-box; }
+    html { scroll-behavior:smooth; }
+    body{
+      margin:0;
+      color:var(--text);
+      background:
+        radial-gradient(1200px 600px at 10% -10%, rgba(105,210,255,.12), transparent 60%),
+        radial-gradient(900px 500px at 100% 0%, rgba(255,134,209,.10), transparent 55%),
+        radial-gradient(900px 500px at 50% 100%, rgba(130,247,195,.08), transparent 55%),
+        linear-gradient(180deg, var(--bg), var(--bg2));
+      font:16px/1.6 Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    a{ color:var(--cyan); text-decoration:none; }
+    a:hover{ text-decoration:underline; }
+
+    .shell{
+      max-width:var(--max);
+      margin:0 auto;
+      padding:24px 18px 90px;
+      display:grid;
+      grid-template-columns: 290px 1fr;
+      gap:22px;
+    }
+
+    .sidebar{
+      position:sticky;
+      top:18px;
+      align-self:start;
+      border:1px solid var(--line);
+      background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.015));
+      backdrop-filter: blur(12px);
+      border-radius:24px;
+      box-shadow:var(--shadow);
+      padding:18px;
+    }
+
+    .brand{
+      padding:6px 4px 14px;
+      border-bottom:1px solid rgba(255,255,255,.08);
+      margin-bottom:14px;
+    }
+
+    .brand h1{
+      margin:0 0 6px;
+      font-size:1.15rem;
+      line-height:1.2;
+    }
+
+    .brand p{
+      margin:0;
+      color:var(--muted);
+      font-size:.94rem;
+    }
+
+    .navgroup{
+      margin-top:14px;
+    }
+
+    .navtitle{
+      font-size:.8rem;
+      letter-spacing:.12em;
+      text-transform:uppercase;
+      color:#8ea4d7;
+      margin:0 0 8px;
+      padding-left:4px;
+    }
+
+    .nav{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+
+    .nav a{
+      display:block;
+      color:var(--text);
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid transparent;
+      background:rgba(255,255,255,.02);
+      transition:.18s ease;
+      font-size:.94rem;
+    }
+
+    .nav a:hover{
+      border-color:var(--line);
+      background:rgba(255,255,255,.05);
+      text-decoration:none;
+      transform:translateX(2px);
+    }
+
+    .legend{
+      display:grid;
+      gap:8px;
+      margin-top:16px;
+      padding-top:16px;
+      border-top:1px solid rgba(255,255,255,.08);
+      font-size:.9rem;
+    }
+
+    .lg{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      color:var(--muted);
+    }
+
+    .dot{
+      width:12px;
+      height:12px;
+      border-radius:999px;
+      flex:0 0 auto;
+      box-shadow:0 0 18px currentColor;
+    }
+
+    .main{
+      min-width:0;
+      display:grid;
+      gap:18px;
+    }
+
+    .hero, .panel{
+      border:1px solid var(--line);
+      border-radius:28px;
+      background:linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.015));
+      backdrop-filter: blur(12px);
+      box-shadow:var(--shadow);
+    }
+
+    .hero{
+      padding:30px;
+      overflow:hidden;
+      position:relative;
+    }
+
+    .hero::after{
+      content:"";
+      position:absolute;
+      inset:auto -10% -20% auto;
+      width:380px;
+      height:380px;
+      background:radial-gradient(circle, rgba(105,210,255,.22), transparent 62%);
+      pointer-events:none;
+    }
+
+    .eyebrow{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 12px;
+      border:1px solid rgba(105,210,255,.35);
+      border-radius:999px;
+      color:#cdeeff;
+      background:rgba(105,210,255,.08);
+      font-size:.85rem;
+      margin-bottom:14px;
+    }
+
+    .hero h2{
+      margin:0 0 12px;
+      font-size:clamp(2rem, 4vw, 3.6rem);
+      line-height:1.05;
+      max-width:960px;
+    }
+
+    .hero p{
+      margin:0;
+      color:var(--muted);
+      max-width:980px;
+      font-size:1.03rem;
+    }
+
+    .hero-grid{
+      margin-top:22px;
+      display:grid;
+      grid-template-columns:repeat(4,1fr);
+      gap:12px;
+    }
+
+    .mini{
+      background:rgba(255,255,255,.03);
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:16px;
+      padding:14px;
+    }
+
+    .mini .k{
+      font-size:.8rem;
+      color:#91a8db;
+      text-transform:uppercase;
+      letter-spacing:.1em;
+      margin-bottom:6px;
+    }
+
+    .mini .v{
+      font-size:1.05rem;
+      font-weight:700;
+    }
+
+    .section-title{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:16px;
+    }
+
+    .section-title h3{
+      margin:0;
+      font-size:1.45rem;
+      line-height:1.2;
+    }
+
+    .section-title p{
+      margin:0;
+      color:var(--muted);
+      max-width:780px;
+    }
+
+    .panel{
+      padding:24px;
+    }
+
+    .pipeline{
+      display:grid;
+      grid-template-columns: repeat(9, minmax(120px, 1fr));
+      gap:10px;
+      align-items:stretch;
+    }
+
+    .stage{
+      position:relative;
+      border-radius:18px;
+      padding:14px;
+      min-height:140px;
+      border:1px solid rgba(255,255,255,.09);
+      overflow:hidden;
+      background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+    }
+
+    .stage::before{
+      content:"";
+      position:absolute;
+      inset:0 0 auto 0;
+      height:4px;
+      background:var(--accent);
+    }
+
+    .stage .idx{
+      font:700 .78rem/1 var(--mono);
+      color:#d6e2ff;
+      opacity:.8;
+      margin-bottom:10px;
+    }
+
+    .stage h4{
+      margin:0 0 8px;
+      font-size:1rem;
+      line-height:1.2;
+    }
+
+    .stage p{
+      margin:0;
+      color:var(--muted);
+      font-size:.92rem;
+      line-height:1.45;
+    }
+
+    .data { --accent: var(--green); }
+    .dist { --accent: var(--cyan); }
+    .model { --accent: var(--blue); }
+    .attn { --accent: var(--purple); }
+    .loss { --accent: var(--pink); }
+    .opt  { --accent: var(--orange); }
+    .sys  { --accent: var(--red); }
+
+    .two{
+      display:grid;
+      grid-template-columns: 1.08fr .92fr;
+      gap:18px;
+      align-items:start;
+    }
+
+    .three{
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:16px;
+    }
+
+    .card{
+      border:1px solid rgba(255,255,255,.08);
+      background:rgba(255,255,255,.03);
+      border-radius:18px;
+      padding:18px;
+      min-width:0;
+    }
+
+    .card h4{
+      margin:0 0 8px;
+      font-size:1.05rem;
+      line-height:1.25;
+    }
+
+    .card p, .card li{
+      color:var(--muted);
+      margin-top:0;
+    }
+
+    .badge-row{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      margin-top:10px;
+    }
+
+    .badge{
+      padding:6px 10px;
+      border-radius:999px;
+      font-size:.82rem;
+      border:1px solid rgba(255,255,255,.1);
+      background:rgba(255,255,255,.04);
+      color:#dbe7ff;
+    }
+
+    .viz{
+      border-radius:20px;
+      padding:18px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.015)),
+        #0b1730;
+      border:1px solid rgba(255,255,255,.08);
+      overflow:auto;
+    }
+
+    .diagram-caption{
+      margin-top:10px;
+      color:var(--muted);
+      font-size:.94rem;
+    }
+
+    .code-wrap{
+      margin-top:16px;
+      display:grid;
+      gap:12px;
+    }
+
+    .code-card{
+      border:1px solid rgba(255,255,255,.09);
+      background:#091326;
+      border-radius:18px;
+      overflow:hidden;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+    }
+
+    .code-head{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding:10px 14px;
+      background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+      border-bottom:1px solid rgba(255,255,255,.07);
+      font-family:var(--mono);
+      font-size:.85rem;
+      color:#bfd3ff;
+    }
+
+    .code-tag{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:4px 8px;
+      border-radius:999px;
+      background:rgba(255,255,255,.05);
+      border:1px solid rgba(255,255,255,.08);
+      color:#dce7ff;
+      font-size:.74rem;
+    }
+
+    pre{
+      margin:0;
+      padding:16px;
+      overflow:auto;
+      color:#dfe9ff;
+      font: 13px/1.55 var(--mono);
+      white-space:pre;
+    }
+
+    code{ font-family:var(--mono); }
+
+    .token-comment{ color:#7f97c8; }
+    .token-keyword{ color:#ff9ed8; }
+    .token-name{ color:#8dd8ff; }
+    .token-str{ color:#9ef2be; }
+    .token-num{ color:#ffcc88; }
+
+    .list-tight{
+      margin:0;
+      padding-left:18px;
+    }
+
+    table{
+      width:100%;
+      border-collapse:collapse;
+      overflow:hidden;
+      border-radius:16px;
+      font-size:.95rem;
+    }
+
+    th, td{
+      padding:12px 10px;
+      border-bottom:1px solid rgba(255,255,255,.08);
+      text-align:left;
+      vertical-align:top;
+    }
+
+    th{ color:#dfe8ff; background:rgba(255,255,255,.04); }
+    td{ color:var(--muted); }
+
+    .note{
+      margin-top:12px;
+      padding:12px 14px;
+      border-radius:14px;
+      border:1px solid rgba(255,191,105,.28);
+      background:rgba(255,191,105,.08);
+      color:#ffe3b7;
+    }
+
+    .footer{
+      color:#94a9d7;
+      font-size:.92rem;
+      text-align:center;
+      padding:10px 0 0;
+    }
+
+    @media (max-width: 1180px){
+      .shell{ grid-template-columns:1fr; }
+      .sidebar{ position:relative; top:0; }
+      .pipeline{ grid-template-columns:repeat(3,1fr); }
+      .two, .three{ grid-template-columns:1fr; }
+      .hero-grid{ grid-template-columns:repeat(2,1fr); }
+    }
+
+    @media (max-width: 720px){
+      .pipeline{ grid-template-columns:1fr; }
+      .hero-grid{ grid-template-columns:1fr; }
+      .hero{ padding:22px; }
+      .panel{ padding:18px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <h1>Modded-NanoGPT</h1>
+        <p>A visual walkthrough of how the repo launches, loads data, builds the model, runs attention, computes loss, and steps its hybrid optimizer.</p>
+      </div>
+
+      <div class="navgroup">
+        <div class="navtitle">Overview</div>
+        <nav class="nav">
+          <a href="#top">Hero</a>
+          <a href="#pipeline">End-to-end pipeline</a>
+          <a href="#map">Codebase map</a>
+        </nav>
+      </div>
+
+      <div class="navgroup">
+        <div class="navtitle">Core flow</div>
+        <nav class="nav">
+          <a href="#launch">1. Launch & distributed setup</a>
+          <a href="#data">2. Data pipeline</a>
+          <a href="#model">3. Model structure</a>
+          <a href="#attention">4. Attention path</a>
+          <a href="#optimizer">5. Optimizer & schedule</a>
+          <a href="#loop">6. Training loop</a>
+          <a href="#kernels">7. Triton / performance layer</a>
+        </nav>
+      </div>
+
+      <div class="navgroup">
+        <div class="navtitle">Reference</div>
+        <nav class="nav">
+          <a href="#files">Important files</a>
+          <a href="#summary">Mental model</a>
+        </nav>
+      </div>
+
+      <div class="legend">
+        <div class="lg"><span class="dot" style="color:var(--green); background:var(--green)"></span> Data / input path</div>
+        <div class="lg"><span class="dot" style="color:var(--cyan); background:var(--cyan)"></span> Distributed / systems setup</div>
+        <div class="lg"><span class="dot" style="color:var(--blue); background:var(--blue)"></span> Model architecture</div>
+        <div class="lg"><span class="dot" style="color:var(--purple); background:var(--purple)"></span> Attention / sequence mechanics</div>
+        <div class="lg"><span class="dot" style="color:var(--pink); background:var(--pink)"></span> Loss / output path</div>
+        <div class="lg"><span class="dot" style="color:var(--orange); background:var(--orange)"></span> Optimizer / scheduling</div>
+        <div class="lg"><span class="dot" style="color:var(--red); background:var(--red)"></span> Performance kernels</div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <section class="hero" id="top">
+        <div class="eyebrow">Visual pipeline • real snippets • color-coded architecture</div>
+        <h2>How <code>modded-nanogpt</code> works, from <code>torchrun</code> to validation loss</h2>
+        <p>
+          This repository is not a small teaching GPT. It is a highly optimized distributed training system built to train a language model
+          as fast as possible on 8 H100s. The core script, <code>train_gpt.py</code>, handles launch, data loading, custom model logic,
+          FlashAttention-3, bigram/value embeddings, a hybrid NorMuon+Adam optimizer, and Triton fused kernels.
+        </p>
+
+        <div class="hero-grid">
+          <div class="mini">
+            <div class="k">Primary entrypoint</div>
+            <div class="v"><code>run.sh → train_gpt.py</code></div>
+          </div>
+          <div class="mini">
+            <div class="k">Execution model</div>
+            <div class="v">8-way distributed training</div>
+          </div>
+          <div class="mini">
+            <div class="k">Hot path</div>
+            <div class="v">Data → GPT forward → loss → hybrid optimizer</div>
+          </div>
+          <div class="mini">
+            <div class="k">Speed layer</div>
+            <div class="v">Triton kernels + FP8 + FlashAttention-3</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="pipeline">
+        <div class="section-title">
+          <div>
+            <h3>End-to-end pipeline</h3>
+            <p>The codebase behaves like a staged training pipeline. Each colored block below corresponds to one major subsystem.</p>
+          </div>
+        </div>
+
+        <div class="pipeline">
+          <div class="stage data">
+            <div class="idx">01</div>
+            <h4>Launch</h4>
+            <p><code>torchrun</code> starts 8 worker processes and runs <code>train_gpt.py</code> on every rank.</p>
+          </div>
+          <div class="stage dist">
+            <div class="idx">02</div>
+            <h4>Distributed setup</h4>
+            <p>Ranks, world size, gradient accumulation, CUDA device, and process groups are initialized.</p>
+          </div>
+          <div class="stage data">
+            <div class="idx">03</div>
+            <h4>Load token shards</h4>
+            <p>FineWeb token shards are read from binary files and packed into BOS-aligned variable-length batches.</p>
+          </div>
+          <div class="stage model">
+            <div class="idx">04</div>
+            <h4>Embed inputs</h4>
+            <p>Token embeddings, bigram hash embeddings, and value embeddings are prepared before the transformer stack.</p>
+          </div>
+          <div class="stage attn">
+            <div class="idx">05</div>
+            <h4>Attention / MLP stack</h4>
+            <p>Custom attention, YaRN rotary logic, paired heads, gated value injection, and fused ReLU² MLP layers run.</p>
+          </div>
+          <div class="stage loss">
+            <div class="idx">06</div>
+            <h4>Compute loss</h4>
+            <p>Training uses a fused soft-capped cross-entropy path; evaluation computes logits explicitly.</p>
+          </div>
+          <div class="stage opt">
+            <div class="idx">07</div>
+            <h4>Backward + optimizer</h4>
+            <p>Gradients are reduced, sparsified where possible, then stepped with NorMuon and Adam.</p>
+          </div>
+          <div class="stage opt">
+            <div class="idx">08</div>
+            <h4>Schedule updates</h4>
+            <p>LR, momentum, attention windows, sequence length, batch size, and tied/untied embeddings evolve over time.</p>
+          </div>
+          <div class="stage sys">
+            <div class="idx">09</div>
+            <h4>Validate & log</h4>
+            <p>Validation loss is periodically computed and timing is tracked as the benchmark metric.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="map">
+        <div class="section-title">
+          <div>
+            <h3>Codebase map</h3>
+            <p>If you only remember one thing: <code>train_gpt.py</code> is the center of gravity, and the rest of the repo supports it.</p>
+          </div>
+        </div>
+
+        <div class="three">
+          <div class="card">
+            <h4>Core trainer</h4>
+            <ul class="list-tight">
+              <li><code>train_gpt.py</code> — main record-setting training script</li>
+              <li><code>train_gpt_medium.py</code> — related trainer for the GPT-2 Medium track</li>
+            </ul>
+            <div class="badge-row">
+              <span class="badge">distributed</span>
+              <span class="badge">model</span>
+              <span class="badge">optimizer</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <h4>Performance layer</h4>
+            <ul class="list-tight">
+              <li><code>triton_kernels.py</code> — custom kernels and fused ops</li>
+              <li><code>kernels</code> package — external kernel loader used by the trainer</li>
+            </ul>
+            <div class="badge-row">
+              <span class="badge">Triton</span>
+              <span class="badge">FP8</span>
+              <span class="badge">fused kernels</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <h4>Data / eval / launch</h4>
+            <ul class="list-tight">
+              <li><code>data/</code> — FineWeb download + preprocessing</li>
+              <li><code>evals/hellaswag.py</code> — optional task evaluation</li>
+              <li><code>run.sh</code> and <code>Dockerfile</code> — launch and environment</li>
+            </ul>
+            <div class="badge-row">
+              <span class="badge">FineWeb</span>
+              <span class="badge">HellaSwag</span>
+              <span class="badge">torchrun</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="launch">
+        <div class="section-title">
+          <div>
+            <h3>1) Launch & distributed setup</h3>
+            <p>The training process starts very simply, but immediately turns into a distributed CUDA program.</p>
+          </div>
+        </div>
+
+        <div class="two">
+          <div>
+            <div class="card">
+              <h4>What happens here</h4>
+              <p>
+                <code>run.sh</code> launches 8 local processes with <code>torchrun</code>. Then <code>train_gpt.py</code> reads
+                environment variables like <code>RANK</code>, <code>WORLD_SIZE</code>, and <code>LOCAL_RANK</code> to initialize
+                CUDA and distributed communications.
+              </p>
+              <ul class="list-tight">
+                <li>Ensures the world size divides 8</li>
+                <li>Sets <code>grad_accum_steps = 8 // world_size</code></li>
+                <li>Initializes NCCL/Gloo process groups</li>
+                <li>Marks rank 0 as the logging / checkpointing process</li>
+              </ul>
+            </div>
+
+            <div class="code-wrap">
+              <div class="code-card">
+                <div class="code-head">
+                  <span><code>run.sh</code></span>
+                  <span class="code-tag">entrypoint</span>
+                </div>
+                <pre><code>torchrun --standalone --nproc_per_node=8 train_gpt.py</code></pre>
+              </div>
+
+              <div class="code-card">
+                <div class="code-head">
+                  <span><code>train_gpt.py#L43-L58</code></span>
+                  <span class="code-tag">distributed bootstrap</span>
+                </div>
+                <pre><code><span class="token-name">rank</span> = <span class="token-name">int</span>(<span class="token-name">os</span>.<span class="token-name">environ</span>[<span class="token-str">"RANK"</span>])
+<span class="token-name">world_size</span> = <span class="token-name">int</span>(<span class="token-name">os</span>.<span class="token-name">environ</span>[<span class="token-str">"WORLD_SIZE"</span>])
+<span class="token-keyword">assert</span> <span class="token-num">8</span> % <span class="token-name">world_size</span> == <span class="token-num">0</span>, <span class="token-str">"world_size must be a divisor of 8"</span>
+<span class="token-name">grad_accum_steps</span> = <span class="token-num">8</span> // <span class="token-name">world_size</span>
+<span class="token-name">grad_scale</span> = <span class="token-num">1</span> / <span class="token-name">grad_accum_steps</span>
+<span class="token-keyword">assert</span> <span class="token-name">torch</span>.<span class="token-name">cuda</span>.<span class="token-name">is_available</span>()
+<span class="token-name">device</span> = <span class="token-name">torch</span>.<span class="token-name">device</span>(<span class="token-str">"cuda"</span>, <span class="token-name">int</span>(<span class="token-name">os</span>.<span class="token-name">environ</span>[<span class="token-str">"LOCAL_RANK"</span>]))
+<span class="token-name">torch</span>.<span class="token-name">cuda</span>.<span class="token-name">set_device</span>(<span class="token-name">device</span>)
+<span class="token-name">dist</span>.<span class="token-name">init_process_group</span>(<span class="token-name">backend</span>=<span class="token-str">"cuda:nccl,cpu:gloo"</span>, <span class="token-name">device_id</span>=<span class="token-name">device</span>)
+<span class="token-name">dist</span>.<span class="token-name">barrier</span>()
+<span class="token-name">master_process</span> = (<span class="token-name">rank</span> == <span class="token-num">0</span>)</code></pre>
+              </div>
+            </div>
+          </div>
+
+          <div class="viz">
+            <svg viewBox="0 0 620 360" width="100%" height="auto" aria-label="distributed launch diagram">
+              <defs>
+                <linearGradient id="g1" x1="0" x2="1">
+                  <stop offset="0%" stop-color="#69d2ff"/>
+                  <stop offset="100%" stop-color="#7ca8ff"/>
+                </linearGradient>
+                <linearGradient id="g2" x1="0" x2="1">
+                  <stop offset="0%" stop-color="#82f7c3"/>
+                  <stop offset="100%" stop-color="#69d2ff"/>
+                </linearGradient>
+              </defs>
+
+              <rect x="20" y="22" width="130" height="72" rx="16" fill="#12203d" stroke="#69d2ff" />
+              <text x="85" y="52" fill="#ecf3ff" font-size="18" text-anchor="middle" font-family="sans-serif">run.sh</text>
+              <text x="85" y="74" fill="#aebee0" font-size="13" text-anchor="middle" font-family="sans-serif">torchrun launcher</text>
+
+              <line x1="150" y1="58" x2="215" y2="58" stroke="url(#g1)" stroke-width="4"/>
+              <polygon points="215,58 203,51 203,65" fill="#7ca8ff"/>
+
+              <rect x="220" y="22" width="170" height="72" rx="16" fill="#12203d" stroke="#7ca8ff" />
+              <text x="305" y="52" fill="#ecf3ff" font-size="18" text-anchor="middle" font-family="sans-serif">train_gpt.py</text>
+              <text x="305" y="74" fill="#aebee0" font-size="13" text-anchor="middle" font-family="sans-serif">all ranks execute this</text>
+
+              <line x1="305" y1="96" x2="305" y2="140" stroke="url(#g2)" stroke-width="4"/>
+              <polygon points="305,140 298,128 312,128" fill="#82f7c3"/>
+
+              <g>
+                <rect x="34" y="156" width="118" height="68" rx="14" fill="#101c35" stroke="#82f7c3"/>
+                <text x="93" y="183" fill="#ecf3ff" font-size="18" text-anchor="middle" font-family="sans-serif">Rank 0</text>
+                <text x="93" y="204" fill="#aebee0" font-size="12" text-anchor="middle" font-family="sans-serif">master/logging</text>
+              </g>
+
+              <g>
+                <rect x="178" y="156" width="118" height="68" rx="14" fill="#101c35" stroke="#69d2ff"/>
+                <text x="237" y="183" fill="#ecf3ff" font-size="18" text-anchor="middle" font-family="sans-serif">Rank 1</text>
+                <text x="237" y="204" fill="#aebee0" font-size="12" text-anchor="middle" font-family="sans-serif">worker</text>
+              </g>
+
+              <g>
+                <rect x="322" y="156" width="118" height="68" rx="14" fill="#101c35" stroke="#69d2ff"/>
+                <text x="381" y="183" fill="#ecf3ff" font-size="18" text-anchor="middle" font-family="sans-serif">Rank 2</text>
+                <text x="381" y="204" fill="#aebee0" font-size="12" text-anchor="middle" font-family="sans-serif">worker</text>
+              </g>
+
+              <g>
+                <rect x="466" y="156" width="118" height="68" rx="14" fill="#101c35" stroke="#69d2ff"/>
+                <text x="525" y="183" fill="#ecf3ff" font-size="18" text-anchor="middle" font-family="sans-serif">Rank N</text>
+                <text x="525" y="204" fill="#aebee0" font-size="12" text-anchor="middle" font-family="sans-serif">worker</text>
+              </g>
+
+              <rect x="90" y="272" width="440" height="54" rx="16" fill="#0d1831" stroke="#284472"/>
+              <text x="310" y="295" fill="#ecf3ff" font-size="17" text-anchor="middle" font-family="sans-serif">Shared process group</text>
+              <text x="310" y="315" fill="#aebee0" font-size="12" text-anchor="middle" font-family="sans-serif">NCCL for GPU comms, Gloo fallback / CPU path</text>
+            </svg>
+            <div class="diagram-caption">
+              One shell command fans out into multiple synchronized GPU workers. The rest of the script assumes a distributed world from the beginning.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="data">
+        <div class="section-title">
+          <div>
+            <h3>2) Data pipeline</h3>
+            <p>The loader is specialized for benchmark throughput: binary token shards, BOS-aligned packing, async shard loading, and bigram hash generation.</p>
+          </div>
+        </div>
+
+        <div class="two">
+          <div>
+            <div class="card">
+              <h4>What the loader does</h4>
+              <ul class="list-tight">
+                <li>Reads tokenized FineWeb shards from <code>.bin</code> files</li>
+                <li>Optionally aligns sequences to BOS boundaries</li>
+                <li>Packs many documents into one variable-length stream</li>
+                <li>Builds <code>cum_lengths</code> for varlen FlashAttention</li>
+                <li>Computes a bigram hash tensor for the bigram embedding path</li>
+                <li>Transfers everything to GPU with <code>non_blocking=True</code></li>
+              </ul>
+            </div>
+
+            <div class="code-wrap">
+              <div class="code-card">
+                <div class="code-head">
+                  <span><code>train_gpt.py#L1455-L1548</code></span>
+                  <span class="code-tag">data generator</span>
+                </div>
+                <pre><code><span class="token-keyword">def</span> <span class="token-name">distributed_data_generator</span>(<span class="token-name">filename_pattern</span>, <span class="token-name">num_tokens</span>, <span class="token-name">max_seq_len</span>, <span class="token-name">grad_accum_steps</span>=<span class="token-num">1</span>, <span class="token-name">align_to_bos</span>=<span class="token-keyword">True</span>):
+    <span class="token-name">rank</span> = <span class="token-name">dist</span>.<span class="token-name">get_rank</span>() <span class="token-keyword">if</span> <span class="token-name">dist</span>.<span class="token-name">is_initialized</span>() <span class="token-keyword">else</span> <span class="token-num">0</span>
+    <span class="token-name">world_size</span> = <span class="token-name">dist</span>.<span class="token-name">get_world_size</span>() <span class="token-keyword">if</span> <span class="token-name">dist</span>.<span class="token-name">is_initialized</span>() <span class="token-keyword">else</span> <span class="token-num">1</span>
+    <span class="token-keyword">assert</span> <span class="token-name">num_tokens</span> % (<span class="token-name">world_size</span> * <span class="token-name">grad_accum_steps</span>) == <span class="token-num">0</span>
+    <span class="token-name">num_tokens</span> = <span class="token-name">num_tokens</span> // <span class="token-name">grad_accum_steps</span>
+
+    <span class="token-name">files</span> = [<span class="token-name">Path</span>(<span class="token-name">file</span>) <span class="token-keyword">for</span> <span class="token-name">file</span> <span class="token-keyword">in</span> <span class="token-name">sorted</span>(<span class="token-name">glob</span>.<span class="token-name">glob</span>(<span class="token-name">filename_pattern</span>))]
+    <span class="token-name">tokens</span> = <span class="token-name">_load_data_shard</span>(<span class="token-name">next</span>(<span class="token-name">file_iter</span>))
+
+    <span class="token-keyword">if</span> <span class="token-name">align_to_bos</span>:
+        <span class="token-name">shard</span> = <span class="token-name">Shard</span>(<span class="token-name">tokens</span>, <span class="token-name">world_size</span>)
+        <span class="token-name">next_shard_getter</span> = <span class="token-name">Shard</span>.<span class="token-name">load_async</span>(<span class="token-name">next</span>(<span class="token-name">file_iter</span>), <span class="token-name">world_size</span>)
+
+    <span class="token-keyword">while</span> <span class="token-keyword">True</span>:
+        <span class="token-name">num_tokens_local</span> = <span class="token-name">num_tokens</span> // <span class="token-name">world_size</span>
+        <span class="token-keyword">if</span> <span class="token-name">align_to_bos</span>:
+            <span class="token-name">seq_starts</span>, <span class="token-name">seq_ends</span> = <span class="token-name">shard</span>.<span class="token-name">next_batch</span>(<span class="token-name">num_tokens_local</span>, <span class="token-name">max_seq_len</span>)
+            <span class="token-name">buf</span> = <span class="token-name">torch</span>.<span class="token-name">cat</span>([<span class="token-name">tokens</span>[<span class="token-name">i</span>:<span class="token-name">j</span>] <span class="token-keyword">for</span> <span class="token-name">i</span>, <span class="token-name">j</span> <span class="token-keyword">in</span> <span class="token-name">zip</span>(<span class="token-name">start_idxs</span>, <span class="token-name">end_idxs</span>)])
+            <span class="token-name">_inputs</span> = <span class="token-name">buf</span>[:-<span class="token-num">1</span>]
+            <span class="token-name">_targets</span> = <span class="token-name">buf</span>[<span class="token-num">1</span>:]
+            <span class="token-name">cum_lengths</span> = (<span class="token-name">end_idxs</span> - <span class="token-name">start_idxs</span>).<span class="token-name">cumsum</span>(<span class="token-num">0</span>)
+
+        <span class="token-name">_bigram_inputs</span> = <span class="token-name">get_bigram_hash</span>(<span class="token-name">_inputs</span>)
+
+        <span class="token-keyword">yield</span> (
+            <span class="token-name">_inputs</span>.<span class="token-name">to</span>(<span class="token-name">device</span>=<span class="token-str">"cuda"</span>, <span class="token-name">non_blocking</span>=<span class="token-keyword">True</span>),
+            <span class="token-name">_targets</span>.<span class="token-name">to</span>(<span class="token-name">device</span>=<span class="token-str">"cuda"</span>, <span class="token-name">non_blocking</span>=<span class="token-keyword">True</span>),
+            <span class="token-name">_cum_lengths</span>.<span class="token-name">to</span>(<span class="token-name">device</span>=<span class="token-str">"cuda"</span>, <span class="token-name">non_blocking</span>=<span class="token-keyword">True</span>),
+            <span class="token-name">_bigram_inputs</span>.<span class="token-name">to</span>(<span class="token-name">device</span>=<span class="token-str">"cuda"</span>, <span class="token-name">non_blocking</span>=<span class="token-keyword">True</span>),
+            <span class="token-name">_bigram_inputs</span>.<span class="token-name">numpy</span>(),
+        )</code></pre>
+              </div>
+
+              <div class="code-card">
+                <div class="code-head">
+                  <span><code>train_gpt.py#L1438-L1454</code></span>
+                  <span class="code-tag">bigram hash</span>
+                </div>
+                <pre><code><span class="token-keyword">def</span> <span class="token-name">get_bigram_hash</span>(<span class="token-name">x</span>):
+    <span class="token-name">rand_int_1</span> = <span class="token-num">36313</span>
+    <span class="token-name">rand_int_2</span> = <span class="token-num">27191</span>
+    <span class="token-name">mod</span> = <span class="token-name">args</span>.<span class="token-name">bigram_vocab_size</span>-<span class="token-num">1</span>
+    <span class="token-name">x</span> = <span class="token-name">x</span>.<span class="token-name">to</span>(<span class="token-name">torch</span>.<span class="token-name">int32</span>)
+    <span class="token-name">out</span> = <span class="token-name">torch</span>.<span class="token-name">empty_like</span>(<span class="token-name">x</span>, <span class="token-name">pin_memory</span>=<span class="token-keyword">True</span>)
+    <span class="token-name">out</span>.<span class="token-name">copy_</span>(<span class="token-name">x</span>)
+    <span class="token-name">out</span>[<span class="token-num">0</span>] = <span class="token-name">mod</span>
+    <span class="token-name">out</span>[<span class="token-num">1</span>:] = <span class="token-name">torch</span>.<span class="token-name">bitwise_xor</span>(<span class="token-name">rand_int_1</span> * <span class="token-name">out</span>[<span class="token-num">1</span>:], <span class="token-name">rand_int_2</span> * <span class="token-name">out</span>[:-<span class="token-num">1</span>]) % <span class="token-name">mod</span></code></pre>
+              </div>
+            </div>
+          </div>
+
+          <div class="viz">
+            <svg viewBox="0 0 680 470" width="100%" height="auto" aria-label="data pipeline">
+              <defs>
+                <linearGradient id="gd" x1="0" x2="1">
+                  <stop offset="0%" stop-color="#82f7c3"/>
+                  <stop offset="100%" stop-color="#69d2ff"/>
+                </linearGradient>
+              </defs>
+
+              <rect x="24" y="26" width="180" height="70" rx="18" fill="#10213e" stroke="#82f7c3"/>
+              <text x="114" y="54" fill="#ecf3ff" font-size="20" text-anchor="middle" font-family="sans-serif">FineWeb .bin shards</text>
+              <text x="114" y="77" fill="#aebee0" font-size="12" text-anchor="middle" font-family="sans-serif">tokenized input files</text>
+
+              <line x1="204" y1="61" x2="274" y2="61" stroke="url(#gd)" stroke-width="4"/>
+              <polygon points="274,61 262,54 262,68" fill="#69d2ff"/>
+
+              <rect x="278" y="26" width="172" height="70" rx="18" fill="#10213e" stroke="#69d2ff"/>
+              <text x="364" y="54" fill="#ecf3ff" font-size="20" text-anchor="middle" font-family="sans-serif">Shard</text>
+              <text x="364" y="77" fill="#aebee0" font-size="12" text-anchor="middle" font-family="sans-serif">BOS scan + async preload</text>
+
+              <line x1="450" y1="61" x2="520" y2="61" stroke="url(#gd)" stroke-width="4"/>
+              <polygon points="520,61 508,54 508,68" fill="#69d2ff"/>
+
+              <rect x="524" y="26" width="132" height="70" rx="18" fill="#10213e" stroke="#82f7c3"/>
+              <text x="590" y="54" fill="#ecf3ff" font-size="18" text-anchor="middle" font-family="sans-serif">Packed batch</text>
+              <text x="590" y="77" fill="#aebee0" font-size="12" text-anchor="middle" font-family="sans-serif">variable-length docs</text>
+
+              <line x1="590" y1="96" x2="590" y2="145" stroke="#82f7c3" stroke-width="4"/>
+              <polygon points="590,145 583,133 597,133" fill="#82f7c3"/>
+
+              <rect x="425" y="150" width="230" height="84" rx="18" fill="#10213e" stroke="#82f7c3"/>
+              <text x="540" y="178" fill="#ecf3ff" font-size="18" text-anchor="middle" font-family="sans-serif">outputs per step</text>
+              <text x="540" y="203" fill="#aebee0" font-size="12" text-anchor="middle" font-family="sans-serif">inputs • targets • cum_lengths</text>
+              <text x="540" y="221" fill="#aebee0" font-size="12" text-anchor="middle" font-family="sans-serif">bigram_inputs • numpy copy</text>
+
+              <rect x="26" y="152" width="350" height="212" rx="22" fill="#0b1730" stroke="#284472"/>
+              <text x="201" y="181" fill="#ecf3ff" font-size="19" text-anchor="middle" font-family="sans-serif">Packing behavior</text>
+
+              <rect x="48" y="205" width="110" height="36" rx="10" fill="#163056" stroke="#69d2ff"/>
+              <text x="103" y="228" fill="#ecf3ff" font-size="14" text-anchor="middle" font-family="sans-serif">doc A</text>
+
+              <rect x="170" y="205" width="80" height="36" rx="10" fill="#163056" stroke="#82f7c3"/>
+              <text x="210" y="228" fill="#ecf3ff" font-size="14" text-anchor="middle" font-family="sans-serif">doc B</text>
+
+              <rect x="262" y="205" width="92" height="36" rx="10" fill="#163056" stroke="#b89cff"/>
+              <text x="308" y="228" fill="#ecf3ff" font-size="14" text-anchor="middle" font-family="sans-serif">doc C</text>
+
+              <text x="52" y="270" fill="#aebee0" font-size="13" font-family="sans-serif">1. align starts to BOS</text>
+              <text x="52" y="293" fill="#aebee0" font-size="13" font-family="sans-serif">2. clip each document to max_seq_len</text>
+              <text x="52" y="316" fill="#aebee0" font-size="13" font-family="sans-serif">3. concatenate docs into one rank-local stream</text>
+              <text x="52" y="339" fill="#aebee0" font-size="13" font-family="sans-serif">4. compute cumulative boundaries for varlen attention</text>
+
+              <rect x="48" y="357" width="300" height="24" rx="10" fill="#101d37" stroke="#82f7c3"/>
+              <circle cx="92" cy="369" r="6" fill="#82f7c3"/>
+              <circle cx="176" cy="369" r="6" fill="#69d2ff"/>
+              <circle cx="252" cy="369" r="6" fill="#b89cff"/>
+              <text x="322" y="372" fill="#aebee0" font-size="12" text-anchor="end" font-family="sans-serif">cum_lengths markers</text>
+            </svg>
+            <div class="diagram-caption">
+              This repo does not use a plain tutorial dataloader. It packs token streams specifically for efficient long-context varlen attention.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="model">
+        <div class="section-title">
+          <div>
+            <h3>3) Model structure</h3>
+            <p>The model is a customized GPT with extra embedding paths, gated residual behavior, parameter banks, and nonstandard layer topology.</p>
+          </div>
+        </div>
+
+        <div class="two">
+          <div>
+            <div class="card">
+              <h4>Key model ideas</h4>
+              <ul class="list-tight">
+                <li><code>embed</code> and <code>lm_head</code> start tied</li>
+                <li><code>bigram_embed</code> injects adjacent-token information</li>
+                <li><code>value_embeds</code> add another learned token-conditioned path</li>
+                <li>Attention and MLP weights live in large <strong>parameter banks</strong> instead of many independent modules</li>
+                <li>Some layers use paired-head attention</li>
+                <li>Layer 6 skips attention and reuses a skip connection</li>
+                <li>Backout subtracts part of an earlier state near the end</li>
+              </ul>
+            </div>
+
+            <div class="code-wrap">
+              <div class="code-card">
+                <div class="code-head">
+                  <span><code>train_gpt.py#L1290-L1370</code></span>
+                  <span class="code-tag">forward path excerpt</span>
+                </div>
+                <pre><code><span class="token-name">x</span> = <span class="token-name">self</span>.<span class="token-name">embed</span>(<span class="token-name">input_seq</span>)
+<span class="token-name">x0_bigram</span> = <span class="token-name">self</span>.<span class="token-name">bigram_embed</span>(<span class="token-name">bigram_input_seq</span>)[<span class="token-keyword">None</span>]
+<span class="token-name">ve</span> = <span class="token-name">self</span>.<span class="token-name">value_embeds</span>.<span class="token-name">view</span>(<span class="token-num">5</span>, <span class="token-name">self</span>.<span class="token-name">vocab_size</span>, -<span class="token-num">1</span>)[:, <span class="token-name">input_seq</span>]
+
+<span class="token-name">smear_gate_out</span> = <span class="token-name">smear_lambda</span> * <span class="token-name">torch</span>.<span class="token-name">sigmoid</span>(
+    <span class="token-name">self</span>.<span class="token-name">smear_gate</span>(<span class="token-name">x</span>[<span class="token-num">1</span>:, :<span class="token-name">self</span>.<span class="token-name">smear_gate</span>.<span class="token-name">weight</span>.<span class="token-name">size</span>(-<span class="token-num">1</span>)])
+)
+<span class="token-name">x</span> = <span class="token-name">torch</span>.<span class="token-name">cat</span>([<span class="token-name">x</span>[:<span class="token-num">1</span>], <span class="token-name">x</span>[<span class="token-num">1</span>:] + <span class="token-name">smear_gate_out</span> * <span class="token-name">x</span>[:-<span class="token-num">1</span>]])
+<span class="token-name">x</span> = <span class="token-name">x0</span> = <span class="token-name">norm</span>(<span class="token-name">x</span>[<span class="token-keyword">None</span>])
+
+<span class="token-name">x</span> = <span class="token-name">x</span> + <span class="token-name">x0_bigram</span> * <span class="token-name">bigram_lambdas</span>[<span class="token-num">0</span>]
+
+<span class="token-keyword">for</span> <span class="token-name">i</span> <span class="token-keyword">in</span> <span class="token-name">range</span>(<span class="token-name">self</span>.<span class="token-name">num_layers</span>):
+    <span class="token-keyword">if</span> <span class="token-name">i</span> == <span class="token-num">6</span>:
+        <span class="token-name">x</span> = <span class="token-name">x</span> + <span class="token-name">skip_gate_out</span> * <span class="token-name">skip_connection</span>
+    <span class="token-keyword">else</span>:
+        <span class="token-name">attn_out</span> = <span class="token-name">attn</span>(<span class="token-name">norm</span>(<span class="token-name">attn_in</span>), <span class="token-name">attn_args</span>, <span class="token-name">qkvo_w</span>)
+        <span class="token-name">x</span> = <span class="token-name">resid_lambdas_attn</span>[<span class="token-name">i</span>] * <span class="token-name">x</span> + <span class="token-name">post_lambdas_attn</span>[<span class="token-name">i</span>] * <span class="token-name">attn_out</span> + <span class="token-name">x0_inject</span>[<span class="token-name">i</span>]
+    <span class="token-name">x</span> = <span class="token-name">resid_lambdas_mlp</span>[<span class="token-name">i</span>] * <span class="token-name">x</span> + <span class="token-name">post_lambdas_mlp</span>[<span class="token-name">i</span>] * <span class="token-name">ReLUSqrdMLP</span>(<span class="token-name">norm</span>(<span class="token-name">x</span>), <span class="token-name">c_fc</span>, <span class="token-name">c_proj</span>)</code></pre>
+              </div>
+            </div>
+          </div>
+
+          <div class="viz">
+            <svg viewBox="0 0 700 560" width="100%" height="auto" aria-label="model architecture">
+              <rect x="34" y="22" width="180" height="58" rx="16" fill="#11213f" stroke="#7ca8ff"/>
+              <text x="124" y="48" fill="#ecf3ff" font-size="19" text-anchor="middle" font-family="sans-serif">input_seq</text>
+              <text x="124" y="67" fill="#aebee0" font-size="12" text-anchor="middle" font-family="sans-serif">token ids</text>
+
+              <rect x="250" y="22" width="184" height="58" rx="16" fill="#11213f" stroke="#82f7c3"/>
+              <text x="342" y="48" fill="#ecf3ff" font-size="19" text-anchor="middle" font-family="sans-serif">embed</text>
+              <text x="342" y="67" fill="#aebee0" font-size="12" text-anchor="middle" font-family="sans-serif">token embedding</text>
+
+              <rect x="470" y="22" width="196" height="58" rx="16" fill="#11213f" stroke="#ff86d1"/>
+              <text x="568" y="48" fill="#ecf3ff" font-size="19" text-anchor="middle" font-family="sans-serif">bigram / value paths</text>
+              <text x="568" y="67" fill="#aebee0" font-size="12" text-anchor="middle" font-family="sans-serif">extra learned signals</text>
+
+              <line x1="214" y1="51" x2="250" y2="51" stroke="#7ca8ff" stroke-width="4"/>
+              <polygon points="250,51 238,44 238,58" fill="#7ca8ff"/>
+              <line x1="434" y1="51" x2="470" y2="51" stroke="#82f7c3" stroke-width="4"/>
+              <polygon points="470,51 458,44 458,58" fill="#82f7c3"/>
+
+              <rect x="90" y="122" width="520" height="82" rx="20" fill="#0d1831" stroke="#284472"/>
+              <text x="350" y="149" fill="#ecf3ff" font-size="19" text-anchor="middle" font-family="sans-serif">pre-transformer mixing</text>
+              <text x="350" y="172" fill="#aebee0" font-size="13" text-anchor="middle" font-family="sans-serif">smear gate • norm • x0 injection • bigram injection</text>
+              <text x="350" y="191" fill="#aebee0" font-size="13" text-anchor="middle" font-family="sans-serif">all before the main layer stack really begins</text>
+
+              <rect x="60" y="246" width="580" height="218" rx="22" fill="#0d1831" stroke="#284472"/>
+              <text x="350" y="275" fill="#ecf3ff" font-size="19" text-anchor="middle" font-family="sans-serif">11-layer transformer-like stack</text>
+
+              <rect x="92" y="306" width="114" height="50" rx="14" fill="#15274a" stroke="#b89cff"/>
+              <text x="149" y="336" fill="#ecf3ff" font-size="16" text-anchor="middle" font-family="sans-serif">paired-head attn</text>
+
+              <rect x="228" y="306" width="114" height="50" rx="14" fill="#15274a" stroke="#7ca8ff"/>
+              <text x="285" y="336" fill="#ecf3ff" font-size="16" text-anchor="middle" font-family="sans-serif">regular attn</text>
+
+              <rect x="365" y="306" width="114" height="50" rx="14" fill="#15274a" stroke="#82f7c3"/>
+              <text x="422" y="336" fill="#ecf3ff" font-size="16" text-anchor="middle" font-family="sans-serif">ReLU² MLP</text>
+
+              <rect x="500" y="306" width="108" height="50" rx="14" fill="#15274a" stroke="#ffbf69"/>
+              <text x="554" y="336" fill="#ecf3ff" font-size="16" text-anchor="middle" font-family="sans-serif">residual gates</text>
+
+              <text x="110" y="392" fill="#aebee0" font-size="13" font-family="sans-serif">• Layer 6 skips attention</text>
+              <text x="110" y="414" fill="#aebee0" font-size="13" font-family="sans-serif">• Layer 3 saves a skip connection</text>
+              <text x="110" y="436" fill="#aebee0" font-size="13" font-family="sans-serif">• Layer 7 saves a backout state</text>
+
+              <rect x="154" y="492" width="392" height="44" rx="14" fill="#11213f" stroke="#ff86d1"/>
+              <text x="350" y="520" fill="#ecf3ff" font-size="17" text-anchor="middle" font-family="sans-serif">final norm → lm_head / fused loss</text>
+            </svg>
+            <div class="diagram-caption">
+              The forward pass is best understood as a main residual stream plus several side channels: bigram embeddings, value embeddings, skip gating, and backout behavior.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="attention">
+        <div class="section-title">
+          <div>
+            <h3>4) Attention path</h3>
+            <p>Attention is not stock PyTorch attention. It is a specialized path that combines QK norm, rotary embeddings, optional paired heads, value embedding injection, and FlashAttention-3 varlen kernels.</p>
+          </div>
+        </div>
+
+        <div class="two">
+          <div>
+            <div class="card">
+              <h4>What makes this attention special</h4>
+              <ul class="list-tight">
+                <li>Weights are passed in from parameter banks</li>
+                <li><code>norm(q)</code> and <code>norm(k)</code> are applied before attention</li>
+                <li>YaRN rotary logic handles changing window sizes</li>
+                <li>Some layers use <strong>paired-head attention</strong></li>
+                <li>Value embeddings can be injected through learned gates</li>
+                <li>Actual attention compute is delegated to <code>flash_attn_varlen_func</code></li>
+              </ul>
+            </div>
+
+            <div class="code-wrap">
+              <div class="code-card">
+                <div class="code-head">
+                  <span><code>train_gpt.py#L1064-L1134</code></span>
+                  <span class="code-tag">attention forward</span>
+                </div>
+                <pre><code><span class="token-name">q</span>, <span class="token-name">k</span>, <span class="token-name">v</span> = <span class="token-name">F</span>.<span class="token-name">linear</span>(
+    <span class="token-name">x</span>, <span class="token-name">sa_lambdas</span>[<span class="token-num">0</span>] * <span class="token-name">qkvo_w</span>[:<span class="token-name">self</span>.<span class="token-name">dim</span> * <span class="token-num">3</span>].<span class="token-name">type_as</span>(<span class="token-name">x</span>)
+).<span class="token-name">view</span>(<span class="token-name">B</span>, <span class="token-name">T</span>, <span class="token-num">3</span> * <span class="token-name">self</span>.<span class="token-name">num_heads</span>, <span class="token-name">self</span>.<span class="token-name">head_dim</span>).<span class="token-name">chunk</span>(<span class="token-num">3</span>, <span class="token-name">dim</span>=-<span class="token-num">2</span>)
+
+<span class="token-name">q</span>, <span class="token-name">k</span> = <span class="token-name">norm</span>(<span class="token-name">q</span>), <span class="token-name">norm</span>(<span class="token-name">k</span>)
+
+<span class="token-keyword">if</span> <span class="token-keyword">not</span> <span class="token-name">self</span>.<span class="token-name">paired</span>:
+    <span class="token-name">q</span>, <span class="token-name">k</span> = <span class="token-name">yarn</span>.<span class="token-name">rotary</span>(<span class="token-name">q</span>), <span class="token-name">yarn</span>.<span class="token-name">rotary</span>(<span class="token-name">k</span>)
+    <span class="token-keyword">if</span> <span class="token-name">ve</span> <span class="token-keyword">is not None</span>:
+        <span class="token-name">ve_gate_out</span> = <span class="token-num">2</span> * <span class="token-name">torch</span>.<span class="token-name">sigmoid</span>(...)
+        <span class="token-name">v</span> = <span class="token-name">v</span> + <span class="token-name">ve_gate_out</span> * <span class="token-name">ve</span>.<span class="token-name">view_as</span>(<span class="token-name">v</span>)
+<span class="token-keyword">else</span>:
+    <span class="token-name">q</span> = <span class="token-name">q</span>.<span class="token-name">view</span>(<span class="token-name">B</span>, <span class="token-name">T</span>, <span class="token-name">self</span>.<span class="token-name">num_heads</span> // <span class="token-num">2</span>, <span class="token-name">self</span>.<span class="token-name">head_dim</span> * <span class="token-num">2</span>)
+    <span class="token-name">k</span> = <span class="token-name">k</span>.<span class="token-name">view</span>(...)
+    <span class="token-name">v</span> = <span class="token-name">v</span>.<span class="token-name">reshape</span>(<span class="token-name">B</span>, <span class="token-name">T</span> * <span class="token-num">2</span>, <span class="token-name">self</span>.<span class="token-name">num_heads</span> // <span class="token-num">2</span>, <span class="token-name">self</span>.<span class="token-name">head_dim</span>)
+
+<span class="token-name">y</span> = <span class="token-name">flash_attn_interface</span>.<span class="token-name">flash_attn_varlen_func</span>(
+    <span class="token-name">q</span>[<span class="token-num">0</span>], <span class="token-name">k</span>[<span class="token-num">0</span>], <span class="token-name">v</span>[<span class="token-num">0</span>],
+    <span class="token-name">cu_seqlens_q</span>=<span class="token-name">seqlens</span>, <span class="token-name">cu_seqlens_k</span>=<span class="token-name">seqlens</span>,
+    <span class="token-name">causal</span>=<span class="token-keyword">True</span>,
+    <span class="token-name">softmax_scale</span>=<span class="token-name">yarn</span>.<span class="token-name">attn_scale</span>,
+    <span class="token-name">window_size</span>=(<span class="token-name">bm_size</span>, <span class="token-num">0</span>)
+)</code></pre>
+              </div>
+            </div>
+          </div>
+
+          <div class="viz">
+            <svg viewBox="0 0 720 460" width="100%" height="auto" aria-label="attention pipeline">
+              <rect x="30" y="28" width="120" height="54" rx="14" fill="#11213f" stroke="#7ca8ff"/>
+              <text x="90" y="60" fill="#ecf3ff" font-size="18" text-anchor="middle" font-family="sans-serif">x</text>
+
+              <rect x="188" y="28" width="150" height="54" rx="14" fill="#11213f" stroke="#7ca8ff"/>
+              <text x="263" y="60" fill="#ecf3ff" font-size="18" text-anchor="middle" font-family="sans-serif">linear → Q K V</text>
+
+              <rect x="375" y="28" width="150" height="54" rx="14" fill="#11213f" stroke="#b89cff"/>
+              <text x="450" y="60" fill="#ecf3ff" font-size="18" text-anchor="middle" font-family="sans-serif">QK norm + YaRN</text>
+
+              <rect x="560" y="28" width="128" height="54" rx="14" fill="#11213f" stroke="#82f7c3"/>
+              <text x="624" y="60" fill="#ecf3ff" font-size="17" text-anchor="middle" font-family="sans-serif">VE injection</text>
+
+              <line x1="150" y1="55" x2="188" y2="55" stroke="#7ca8ff" stroke-width="4"/>
+              <line x1="338" y1="55" x2="375" y2="55" stroke="#b89cff" stroke-width="4"/>
+              <line x1="525" y1="55" x2="560" y2="55" stroke="#82f7c3" stroke-width="4"/>
+
+              <rect x="76" y="136" width="560" height="120" rx="24" fill="#0d1831" stroke="#284472"/>
+              <text x="356" y="168" fill="#ecf3ff" font-size="22" text-anchor="middle" font-family="sans-serif">FlashAttention-3 varlen kernel</text>
+              <text x="356" y="194" fill="#aebee0" font-size="14" text-anchor="middle" font-family="sans-serif">uses packed sequences and cumulative boundaries</text>
+
+              <rect x="116" y="214" width="120" height="26" rx="10" fill="#17315a"/>
+              <rect x="246" y="214" width="92" height="26" rx="10" fill="#17315a"/>
+              <rect x="348" y="214" width="156" height="26" rx="10" fill="#17315a"/>
+              <rect x="514" y="214" width="82" height="26" rx="10" fill="#17315a"/>
+
+              <text x="176" y="232" fill="#ecf3ff" font-size="12" text-anchor="middle" font-family="sans-serif">sequence A</text>
+              <text x="292" y="232" fill="#ecf3ff" font-size="12" text-anchor="middle" font-family="sans-serif">seq B</text>
+              <text x="426" y="232" fill="#ecf3ff" font-size="12" text-anchor="middle" font-family="sans-serif">sequence C</text>
+              <text x="555" y="232" fill="#ecf3ff" font-size="12" text-anchor="middle" font-family="sans-serif">seq D</text>
+
+              <line x1="356" y1="258" x2="356" y2="308" stroke="#69d2ff" stroke-width="4"/>
+              <polygon points="356,308 349,296 363,296" fill="#69d2ff"/>
+
+              <rect x="234" y="314" width="244" height="64" rx="18" fill="#11213f" stroke="#ff86d1"/>
+              <text x="356" y="340" fill="#ecf3ff" font-size="19" text-anchor="middle" font-family="sans-serif">project + gate output</text>
+              <text x="356" y="362" fill="#aebee0" font-size="13" text-anchor="middle" font-family="sans-serif">attention result goes back to residual stream</text>
+            </svg>
+            <div class="diagram-caption">
+              Packed docs are treated as one long tensor, and <code>cum_lengths</code> tells the attention kernel where each sequence begins and ends.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="optimizer">
+        <div class="section-title">
+          <div>
+            <h3>5) Optimizer & schedule</h3>
+            <p>The optimizer is hybrid and policy-driven: large projection matrices use NorMuon, while embeddings/gates/scalars use Adam. The training schedule also changes batch size, window sizes, and sequence length over time.</p>
+          </div>
+        </div>
+
+        <div class="two">
+          <div>
+            <div class="card">
+              <h4>Optimizer mental model</h4>
+              <p>
+                <code>TrainingManager</code> is the orchestration layer. It decides which parameters belong to which optimizer,
+                which communication mode they use, and when schedule changes should affect the model and data loader.
+              </p>
+              <ul class="list-tight">
+                <li><strong>NorMuon</strong> for large parameter banks: <code>qk_bank</code>, <code>vo_bank</code>, <code>mlp_bank</code></li>
+                <li><strong>Adam</strong> for embeddings, gates, lambdas, and scalars</li>
+                <li>Some params are <code>replicated</code>, some <code>sharded</code>, and bigram gradients can be <code>sharded_sparse</code></li>
+                <li>Adam only steps on odd steps</li>
+                <li>Embedding can split from <code>lm_head</code> later in training</li>
+              </ul>
+            </div>
+
+            <div class="code-wrap">
+              <div class="code-card">
+                <div class="code-head">
+                  <span><code>train_gpt.py#L1676-L1808</code></span>
+                  <span class="code-tag">training manager</span>
+                </div>
+                <pre><code><span class="token-name">self</span>.<span class="token-name">param_table</span> = {
+    <span class="token-str">"qk_bank"</span>:        {<span class="token-str">"optim"</span>: <span class="token-str">"normuon"</span>, <span class="token-str">"comms"</span>: <span class="token-str">"sharded"</span>},
+    <span class="token-str">"vo_bank"</span>:        {<span class="token-str">"optim"</span>: <span class="token-str">"normuon"</span>, <span class="token-str">"comms"</span>: <span class="token-str">"sharded"</span>},
+    <span class="token-str">"mlp_bank"</span>:       {<span class="token-str">"optim"</span>: <span class="token-str">"normuon"</span>, <span class="token-str">"comms"</span>: <span class="token-str">"sharded"</span>},
+    <span class="token-str">"scalars"</span>:        {<span class="token-str">"optim"</span>: <span class="token-str">"adam"</span>, <span class="token-str">"comms"</span>: <span class="token-str">"replicated"</span>, <span class="token-str">"lr_mul"</span>: <span class="token-num">5.0</span>},
+    <span class="token-str">"bigram_embed"</span>:   {<span class="token-str">"optim"</span>: <span class="token-str">"adam"</span>, <span class="token-str">"comms"</span>: <span class="token-str">"sharded_sparse"</span>, <span class="token-str">"lr_mul"</span>: <span class="token-num">75.</span>},
+    <span class="token-str">"value_embeds"</span>:   {<span class="token-str">"optim"</span>: <span class="token-str">"adam"</span>, <span class="token-str">"comms"</span>: <span class="token-str">"sharded"</span>, <span class="token-str">"lr_mul"</span>: <span class="token-num">75.</span>},
+    <span class="token-str">"embed"</span>:          {<span class="token-str">"optim"</span>: <span class="token-str">"adam"</span>, <span class="token-str">"comms"</span>: <span class="token-str">"sharded"</span>}
+}
+
+<span class="token-keyword">def</span> <span class="token-name">step_optimizers</span>(<span class="token-name">self</span>, <span class="token-name">step</span>):
+    <span class="token-name">step_lr</span> = <span class="token-name">training_schedule</span>.<span class="token-name">get_lr</span>(<span class="token-name">step</span>)
+    <span class="token-name">muon_momentum</span> = <span class="token-name">get_muon_momentum</span>(<span class="token-name">step</span>)
+    <span class="token-name">do_adam</span> = <span class="token-name">self</span>.<span class="token-name">_is_adam_step</span>(<span class="token-name">step</span>)
+
+    <span class="token-keyword">for</span> <span class="token-name">param</span>, <span class="token-name">p_cfg</span> <span class="token-keyword">in</span> <span class="token-name">self</span>.<span class="token-name">optimizer</span>.<span class="token-name">param_cfgs</span>.<span class="token-name">items</span>():
+        <span class="token-name">p_cfg</span>.<span class="token-name">lr</span> = <span class="token-name">p_cfg</span>.<span class="token-name">initial_lr</span> * <span class="token-name">step_lr</span>
+        <span class="token-keyword">if</span> <span class="token-name">p_cfg</span>.<span class="token-name">optim</span> == <span class="token-str">"normuon"</span>:
+            <span class="token-name">p_cfg</span>.<span class="token-name">momentum</span> = <span class="token-name">muon_momentum</span>
+
+    <span class="token-name">self</span>.<span class="token-name">optimizer</span>.<span class="token-name">step</span>(<span class="token-name">do_adam</span>=<span class="token-name">do_adam</span>)</code></pre>
+              </div>
+            </div>
+          </div>
+
+          <div class="viz">
+            <svg viewBox="0 0 700 500" width="100%" height="auto" aria-label="optimizer split">
+              <rect x="248" y="26" width="210" height="68" rx="18" fill="#11213f" stroke="#ffbf69"/>
+              <text x="353" y="54" fill="#ecf3ff" font-size="22" text-anchor="middle" font-family="sans-serif">TrainingManager</text>
+              <text x="353" y="76" fill="#aebee0" font-size="13" text-anchor="middle" font-family="sans-serif">policy + schedule + optimizer routing</text>
+
+              <line x1="353" y1="94" x2="180" y2="146" stroke="#ffbf69" stroke-width="4"/>
+              <line x1="353" y1="94" x2="526" y2="146" stroke="#ffbf69" stroke-width="4"/>
+
+              <rect x="46" y="152" width="268" height="220" rx="22" fill="#0d1831" stroke="#b89cff"/>
+              <text x="180" y="184" fill="#ecf3ff" font-size="22" text-anchor="middle" font-family="sans-serif">NorMuon</text>
+              <text x="180" y="210" fill="#aebee0" font-size="13" text-anchor="middle" font-family="sans-serif">large projection matrices</text>
+
+              <text x="82" y="252" fill="#aebee0" font-size="14" font-family="sans-serif">• qk_bank</text>
+              <text x="82" y="279" fill="#aebee0" font-size="14" font-family="sans-serif">• vo_bank</text>
+              <text x="82" y="306" fill="#aebee0" font-size="14" font-family="sans-serif">• mlp_bank</text>
+              <text x="82" y="345" fill="#aebee0" font-size="13" font-family="sans-serif">orthogonalized / sharded path</text>
+
+              <rect x="386" y="152" width="268" height="290" rx="22" fill="#0d1831" stroke="#69d2ff"/>
+              <text x="520" y="184" fill="#ecf3ff" font-size="22" text-anchor="middle" font-family="sans-serif">Adam</text>
+              <text x="520" y="210" fill="#aebee0" font-size="13" text-anchor="middle" font-family="sans-serif">embeddings, gates, scalars</text>
+
+              <text x="418" y="246" fill="#aebee0" font-size="14" font-family="sans-serif">• embed / lm_head</text>
+              <text x="418" y="272" fill="#aebee0" font-size="14" font-family="sans-serif">• value_embeds</text>
+              <text x="418" y="298" fill="#aebee0" font-size="14" font-family="sans-serif">• bigram_embed</text>
+              <text x="418" y="324" fill="#aebee0" font-size="14" font-family="sans-serif">• gates + lambdas + scalars</text>
+              <text x="418" y="362" fill="#aebee0" font-size="13" font-family="sans-serif">replicated / sharded / sparse-sharded</text>
+              <text x="418" y="386" fill="#aebee0" font-size="13" font-family="sans-serif">Adam only updates on odd steps</text>
+              <text x="418" y="410" fill="#aebee0" font-size="13" font-family="sans-serif">embed unties from lm_head later</text>
+
+              <rect x="206" y="402" width="164" height="52" rx="14" fill="#11213f" stroke="#82f7c3"/>
+              <text x="288" y="433" fill="#ecf3ff" font-size="16" text-anchor="middle" font-family="sans-serif">distributed comm overlap</text>
+            </svg>
+            <div class="diagram-caption">
+              The optimizer is not just Adam with fancy hyperparameters. It is a split system with different update math and communication policies per parameter family.
+            </div>
+          </div>
+        </div>
+
+        <div class="note">
+          Schedule changes matter a lot here: batch size, max sequence length, sliding attention windows, learning rate, Muon momentum, and embed untie timing all affect the live training behavior.
+        </div>
+      </section>
+
+      <section class="panel" id="loop">
+        <div class="section-title">
+          <div>
+            <h3>6) Training loop</h3>
+            <p>The script first warms up and compiles representative kernels, resets the model state, then enters the measured train/validation loop.</p>
+          </div>
+        </div>
+
+        <div class="two">
+          <div>
+            <div class="card">
+              <h4>Loop structure</h4>
+              <ol class="list-tight">
+                <li>Warm up compilation on a few selected schedule-transition steps</li>
+                <li>Reset model and optimizer so warmup does not count as training progress</li>
+                <li>For each step, update schedule settings</li>
+                <li>Periodically run validation</li>
+                <li>For each grad accumulation microstep: fetch batch, sparse-index bookkeeping, forward, backward</li>
+                <li>Step the hybrid optimizer</li>
+                <li>Track timing for benchmark comparison</li>
+              </ol>
+            </div>
+
+            <div class="code-wrap">
+              <div class="code-card">
+                <div class="code-head">
+                  <span><code>train_gpt.py#L1913-L2018</code></span>
+                  <span class="code-tag">warmup + train loop</span>
+                </div>
+                <pre><code><span class="token-name">print0</span>(<span class="token-str">"Compiling model and warming up kernels (~7 minutes on first execution)"</span>, <span class="token-name">console</span>=<span class="token-keyword">True</span>)
+<span class="token-name">initial_state</span> = <span class="token-name">dict</span>(<span class="token-name">model</span>=<span class="token-name">copy</span>.<span class="token-name">deepcopy</span>(<span class="token-name">model</span>.<span class="token-name">state_dict</span>()),
+                     <span class="token-name">optimizer</span>=<span class="token-name">training_manager</span>.<span class="token-name">get_state</span>())
+<span class="token-name">train_loader</span> = <span class="token-name">distributed_data_generator</span>(...)
+<span class="token-name">val_loader</span> = <span class="token-name">distributed_data_generator</span>(...)
+
+<span class="token-keyword">for</span> <span class="token-name">step</span> <span class="token-keyword">in</span> <span class="token-name">warmup_steps</span>:
+    <span class="token-name">training_manager</span>.<span class="token-name">advance_schedule</span>(<span class="token-name">step</span>)
+    <span class="token-name">model</span>.<span class="token-name">eval</span>()
+    <span class="token-keyword">with</span> <span class="token-name">torch</span>.<span class="token-name">no_grad</span>():
+        <span class="token-name">inputs</span>, <span class="token-name">targets</span>, <span class="token-name">cum_seqlens</span>, <span class="token-name">bigram_inputs</span>, _ = <span class="token-name">next</span>(<span class="token-name">val_loader</span>)
+        <span class="token-name">model</span>(<span class="token-name">inputs</span>, <span class="token-name">targets</span>, <span class="token-name">cum_seqlens</span>, <span class="token-name">bigram_inputs</span>, <span class="token-name">training_manager</span>.<span class="token-name">get_forward_args</span>()).<span class="token-name">mean</span>()
+    <span class="token-name">model</span>.<span class="token-name">train</span>()
+    <span class="token-keyword">for</span> <span class="token-name">idx</span> <span class="token-keyword">in</span> <span class="token-name">range</span>(<span class="token-name">grad_accum_steps</span>):
+        <span class="token-name">inputs</span>, <span class="token-name">targets</span>, <span class="token-name">cum_seqlens</span>, <span class="token-name">bigram_inputs</span>, <span class="token-name">bigram_cpu</span> = <span class="token-name">train_loader</span>.<span class="token-name">send</span>(<span class="token-name">send_args</span>)
+        <span class="token-name">training_manager</span>.<span class="token-name">sparse_index_update</span>(<span class="token-name">step</span>, <span class="token-name">bigram_cpu</span>)
+        <span class="token-name">loss</span> = <span class="token-name">model</span>(<span class="token-name">inputs</span>, <span class="token-name">targets</span>, <span class="token-name">cum_seqlens</span>, <span class="token-name">bigram_inputs</span>, <span class="token-name">training_manager</span>.<span class="token-name">get_forward_args</span>()).<span class="token-name">sum</span>() * <span class="token-name">grad_scale</span>
+        <span class="token-name">training_manager</span>.<span class="token-name">sparse_index_share</span>(<span class="token-name">step</span>)
+        <span class="token-name">loss</span>.<span class="token-name">backward</span>()
+    <span class="token-name">training_manager</span>.<span class="token-name">step_optimizers</span>(<span class="token-name">step</span>)
+
+<span class="token-name">model</span>.<span class="token-name">load_state_dict</span>(<span class="token-name">initial_state</span>[<span class="token-str">"model"</span>])
+<span class="token-name">training_manager</span>.<span class="token-name">reset</span>(<span class="token-name">initial_state</span>[<span class="token-str">"optimizer"</span>])
+
+<span class="token-keyword">for</span> <span class="token-name">step</span> <span class="token-keyword">in</span> <span class="token-name">range</span>(<span class="token-name">train_steps</span> + <span class="token-num">1</span>):
+    <span class="token-name">training_manager</span>.<span class="token-name">advance_schedule</span>(<span class="token-name">step</span>)
+    <span class="token-comment"># validation branch</span>
+    <span class="token-comment"># training branch</span>
+    <span class="token-keyword">for</span> <span class="token-name">idx</span> <span class="token-keyword">in</span> <span class="token-name">range</span>(<span class="token-name">grad_accum_steps</span>):
+        <span class="token-name">inputs</span>, <span class="token-name">targets</span>, <span class="token-name">cum_seqlens</span>, <span class="token-name">bigram_inputs</span>, <span class="token-name">bigram_cpu</span> = <span class="token-name">train_loader</span>.<span class="token-name">send</span>(<span class="token-name">training_manager</span>.<span class="token-name">train_loader_send_args</span>)
+        <span class="token-name">loss</span> = <span class="token-name">model</span>(...).<span class="token-name">sum</span>() * <span class="token-name">grad_scale</span>
+        <span class="token-name">loss</span>.<span class="token-name">backward</span>()
+    <span class="token-name">training_manager</span>.<span class="token-name">step_optimizers</span>(<span class="token-name">step</span>)</code></pre>
+              </div>
+            </div>
+          </div>
+
+          <div class="viz">
+            <svg viewBox="0 0 700 430" width="100%" height="auto" aria-label="training timeline">
+              <rect x="42" y="54" width="612" height="18" rx="9" fill="#15284b" stroke="#284472"/>
+              <rect x="42" y="54" width="118" height="18" rx="9" fill="#69d2ff"/>
+              <rect x="160" y="54" width="300" height="18" rx="0" fill="#82f7c3"/>
+              <rect x="460" y="54" width="122" height="18" rx="0" fill="#ffbf69"/>
+              <rect x="582" y="54" width="72" height="18" rx="9" fill="#ff86d1"/>
+
+              <text x="42" y="35" fill="#ecf3ff" font-size="18" font-family="sans-serif">time / steps</text>
+
+              <line x1="102" y1="72" x2="102" y2="120" stroke="#69d2ff" stroke-width="3"/>
+              <line x1="312" y1="72" x2="312" y2="170" stroke="#82f7c3" stroke-width="3"/>
+              <line x1="520" y1="72" x2="520" y2="220" stroke="#ffbf69" stroke-width="3"/>
+              <line x1="620" y1="72" x2="620" y2="270" stroke="#ff86d1" stroke-width="3"/>
+
+              <rect x="38" y="120" width="128" height="46" rx="14" fill="#10213e" stroke="#69d2ff"/>
+              <text x="102" y="148" fill="#ecf3ff" font-size="16" text-anchor="middle" font-family="sans-serif">warmup compile</text>
+
+              <rect x="220" y="170" width="184" height="52" rx="14" fill="#10213e" stroke="#82f7c3"/>
+              <text x="312" y="201" fill="#ecf3ff" font-size="16" text-anchor="middle" font-family="sans-serif">main train loop</text>
+
+              <rect x="447" y="220" width="146" height="52" rx="14" fill="#10213e" stroke="#ffbf69"/>
+              <text x="520" y="252" fill="#ecf3ff" font-size="16" text-anchor="middle" font-family="sans-serif">validation pass</text>
+
+              <rect x="553" y="270" width="134" height="52" rx="14" fill="#10213e" stroke="#ff86d1"/>
+              <text x="620" y="301" fill="#ecf3ff" font-size="16" text-anchor="middle" font-family="sans-serif">final eval/log</text>
+
+              <rect x="122" y="348" width="456" height="42" rx="14" fill="#0d1831" stroke="#284472"/>
+              <text x="350" y="373" fill="#aebee0" font-size="13" text-anchor="middle" font-family="sans-serif">
+                warmup compiles representative kernels first, then state is reset before real measured training begins
+              </text>
+            </svg>
+            <div class="diagram-caption">
+              A key benchmark detail: the script intentionally warms up kernels first, then restores the initial model/optimizer state so compilation does not count as training progress.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="kernels">
+        <div class="section-title">
+          <div>
+            <h3>7) Triton / performance layer</h3>
+            <p>Much of the speed comes from custom low-level kernels: symmetric matmuls, fused MLP work, fused loss, transpose helpers, and FP8-oriented paths.</p>
+          </div>
+        </div>
+
+        <div class="two">
+          <div>
+            <div class="card">
+              <h4>What lives in <code>triton_kernels.py</code></h4>
+              <ul class="list-tight">
+                <li><code>XXT</code> and <code>XTX</code> for symmetric matrix multiplies</li>
+                <li>kernels used by Polar Express / Muon-style orthogonalization</li>
+                <li>fused linear + ReLU² kernels</li>
+                <li>fused soft-capped cross-entropy</li>
+                <li>transpose copy / transpose add helpers</li>
+              </ul>
+            </div>
+
+            <div class="code-wrap">
+              <div class="code-card">
+                <div class="code-head">
+                  <span><code>triton_kernels.py#L1-L120</code></span>
+                  <span class="code-tag">kernel layer</span>
+                </div>
+                <pre><code><span class="token-keyword">import</span> <span class="token-name">torch</span>
+<span class="token-keyword">import</span> <span class="token-name">triton</span>
+<span class="token-keyword">import</span> <span class="token-name">triton</span>.<span class="token-name">language</span> <span class="token-keyword">as</span> <span class="token-name">tl</span>
+
+<span class="token-keyword">@triton</span>.<span class="token-name">jit</span>
+<span class="token-keyword">def</span> <span class="token-name">XXT_kernel</span>(...):
+    <span class="token-comment"># compute symmetric matrix product blocks</span>
+    <span class="token-name">pid</span> = <span class="token-name">tl</span>.<span class="token-name">program_id</span>(<span class="token-name">axis</span>=<span class="token-num">0</span>)
+    ...
+    <span class="token-name">accumulator</span> = <span class="token-name">tl</span>.<span class="token-name">zeros</span>((<span class="token-name">BLOCK_SIZE_M</span>, <span class="token-name">BLOCK_SIZE_N</span>), <span class="token-name">dtype</span>=<span class="token-name">tl</span>.<span class="token-name">float32</span>)
+    <span class="token-keyword">for</span> <span class="token-name">k</span> <span class="token-keyword">in</span> <span class="token-name">tl</span>.<span class="token-name">range</span>(<span class="token-num">0</span>, <span class="token-name">tl</span>.<span class="token-name">cdiv</span>(<span class="token-name">K</span>, <span class="token-name">BLOCK_SIZE_K</span>)):
+        ...
+        <span class="token-name">accumulator</span> = <span class="token-name">tl</span>.<span class="token-name">dot</span>(<span class="token-name">a</span>, <span class="token-name">at</span>, <span class="token-name">accumulator</span>)
+    ...
+<span class="token-keyword">def</span> <span class="token-name">XXT</span>(<span class="token-name">A</span>: <span class="token-name">torch</span>.<span class="token-name">Tensor</span>, <span class="token-name">out</span>: <span class="token-name">torch</span>.<span class="token-name">Tensor</span>):
+    <span class="token-comment"># launch Triton kernel to compute C = A @ A.T</span>
+    ...</code></pre>
+              </div>
+            </div>
+          </div>
+
+          <div class="viz">
+            <svg viewBox="0 0 680 420" width="100%" height="auto" aria-label="performance stack">
+              <rect x="236" y="24" width="210" height="58" rx="16" fill="#11213f" stroke="#ff7d7d"/>
+              <text x="341" y="58" fill="#ecf3ff" font-size="21" text-anchor="middle" font-family="sans-serif">Python trainer</text>
+
+              <line x1="341" y1="82" x2="341" y2="122" stroke="#ff7d7d" stroke-width="4"/>
+              <polygon points="341,122 334,110 348,110" fill="#ff7d7d"/>
+
+              <rect x="132" y="128" width="418" height="70" rx="18" fill="#0d1831" stroke="#284472"/>
+              <text x="341" y="156" fill="#ecf3ff" font-size="20" text-anchor="middle" font-family="sans-serif">custom ops + fused kernels</text>
+              <text x="341" y="178" fill="#aebee0" font-size="13" text-anchor="middle" font-family="sans-serif">FP8 matmul • XXT/XTX • ReLU² • fused cross entropy</text>
+
+              <line x1="341" y1="198" x2="190" y2="254" stroke="#69d2ff" stroke-width="4"/>
+              <line x1="341" y1="198" x2="341" y2="254" stroke="#82f7c3" stroke-width="4"/>
+              <line x1="341" y1="198" x2="492" y2="254" stroke="#ff86d1" stroke-width="4"/>
+
+              <rect x="62" y="260" width="256" height="96" rx="20" fill="#10213e" stroke="#69d2ff"/>
+              <text x="190" y="291" fill="#ecf3ff" font-size="19" text-anchor="middle" font-family="sans-serif">attention speed path</text>
+              <text x="190" y="315" fill="#aebee0" font-size="13" text-anchor="middle" font-family="sans-serif">FlashAttention-3 + varlen packing</text>
+              <text x="190" y="335" fill="#aebee0" font-size="13" text-anchor="middle" font-family="sans-serif">windowed long-context execution</text>
+
+              <rect x="338" y="260" width="256" height="96" rx="20" fill="#10213e" stroke="#82f7c3"/>
+              <text x="466" y="291" fill="#ecf3ff" font-size="19" text-anchor="middle" font-family="sans-serif">optimizer speed path</text>
+              <text x="466" y="315" fill="#aebee0" font-size="13" text-anchor="middle" font-family="sans-serif">Muon/NorMuon math + comm overlap</text>
+              <text x="466" y="335" fill="#aebee0" font-size="13" text-anchor="middle" font-family="sans-serif">symmetric Triton matrix kernels</text>
+            </svg>
+            <div class="diagram-caption">
+              Conceptually, Python is the control plane. The real throughput-critical math is pushed into fused kernels and specialized attention/optimizer implementations.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="files">
+        <div class="section-title">
+          <div>
+            <h3>Important files</h3>
+            <p>Use this as a map when you start reading the repository.</p>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>File</th>
+              <th>Role</th>
+              <th>Why it matters</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>run.sh</code></td>
+              <td>Launch script</td>
+              <td>Starts distributed training with <code>torchrun</code>.</td>
+            </tr>
+            <tr>
+              <td><code>train_gpt.py</code></td>
+              <td>Main trainer</td>
+              <td>Contains the distributed setup, model, data loader, schedule, optimizer, and train loop.</td>
+            </tr>
+            <tr>
+              <td><code>triton_kernels.py</code></td>
+              <td>Kernel implementations</td>
+              <td>Holds fused Triton code that accelerates core math paths.</td>
+            </tr>
+            <tr>
+              <td><code>train_gpt_medium.py</code></td>
+              <td>Alternate trainer</td>
+              <td>Implements the GPT-2 Medium benchmark track with similar ideas.</td>
+            </tr>
+            <tr>
+              <td><code>data/fineweb.py</code></td>
+              <td>Dataset preprocessing</td>
+              <td>Builds the binary FineWeb shards expected by the trainer.</td>
+            </tr>
+            <tr>
+              <td><code>data/cached_fineweb10B.py</code></td>
+              <td>Fast data fetch</td>
+              <td>Downloads already-tokenized FineWeb shards.</td>
+            </tr>
+            <tr>
+              <td><code>evals/hellaswag.py</code></td>
+              <td>Optional evaluation</td>
+              <td>Scores the trained model on HellaSwag after training.</td>
+            </tr>
+            <tr>
+              <td><code>README.md</code></td>
+              <td>Project context</td>
+              <td>Explains the benchmark, record history, setup, and rules.</td>
+            </tr>
+            <tr>
+              <td><code>Dockerfile</code></td>
+              <td>Environment</td>
+              <td>Provides a reproducible CUDA/Python/PyTorch runtime.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="panel" id="summary">
+        <div class="section-title">
+          <div>
+            <h3>Mental model summary</h3>
+            <p>If you need a simple way to explain this codebase to someone else, use these three sentences.</p>
+          </div>
+        </div>
+
+        <div class="three">
+          <div class="card">
+            <h4>1. It is a pipeline, not just a model file</h4>
+            <p>
+              The repo is built around a full training system: launch, distributed setup, data packing, forward pass, fused loss, optimizer stepping, validation, and logging.
+            </p>
+          </div>
+          <div class="card">
+            <h4>2. The model has several side channels</h4>
+            <p>
+              The transformer core is augmented with bigram embeddings, value embeddings, paired-head attention, skip gating, smear, and backout behavior.
+            </p>
+          </div>
+          <div class="card">
+            <h4>3. Speed comes from systems engineering</h4>
+            <p>
+              The biggest gains come from kernel fusion, communication overlap, sharding, FlashAttention-3 varlen execution, FP8/custom ops, and schedule tuning.
+            </p>
+          </div>
+        </div>
+
+        <div class="note">
+          Best way to read the repo: start with <code>run.sh</code>, then skim <code>train_gpt.py</code> in this order —
+          distributed setup → data loader → model forward → <code>TrainingManager</code> → main loop → Triton kernels.
+        </div>
+      </section>
+
+      <div class="footer">
+        Built as a visual explainer for the <code>modded-nanogpt</code> codebase.
+      </div>
+    </main>
+  </div>
+</body>
+</html>

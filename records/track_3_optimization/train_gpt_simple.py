@@ -37,7 +37,12 @@ def _load_data_shard(file: Path):
     return tokens
 
 def distributed_data_generator(filename_pattern: str, batch_size: int, seq_len=1024):
-    files = sorted(Path.cwd().glob(filename_pattern))
+    # Resolve data paths from the repository root by default, not the caller's cwd.
+    # Override with DATA_PATH=/path/containing/data if shards live elsewhere.
+    data_root = Path(os.environ.get("DATA_PATH", Path(__file__).resolve().parents[2]))
+    files = sorted(data_root.glob(filename_pattern))
+    if not files:
+        raise FileNotFoundError(f"No files found for pattern {filename_pattern!r} under {data_root}")
     assert batch_size % dist.get_world_size() == 0
     local_batch_size = batch_size // dist.get_world_size()
     file_iter = iter(files)
@@ -179,23 +184,66 @@ def zeropower_via_newtonschulz5(G: Tensor) -> Tensor:
         X = X.mT
     return X
 
-@torch.compile
-def muon_update(grad, momentum, mu=0.95, nesterov=True):
-    momentum.lerp_(grad, 1 - mu)
-    update = grad.lerp_(momentum, mu) if nesterov else momentum
-    update = zeropower_via_newtonschulz5(update)
-    update *= max(1, grad.size(-2) / grad.size(-1))**0.5
-    return update
+@torch.compile(dynamic=False, fullgraph=True)
+def specmuon_reconstruct(U, S, Vh, r, sqrt_loss, lr, eps: float, sav_smooth: float, top_k: int):
+    """Build SpecMuon update direction O and update SAV state r in-place."""
+    k_act = min(top_k, S.shape[-1])
+
+    # SAV update for top-k directions
+    s_k = S[:k_act]
+    d_grad_norm = s_k / (sqrt_loss + eps)  # ||s_j u_j v_j^T / sqrt(L)||_F == s_j / sqrt(L)
+    eta_prime = lr / (s_k + eps)
+    r_new = r[:k_act] / (1.0 + 0.5 * eta_prime * d_grad_norm)
+
+    scale = r_new / (sqrt_loss + eps)
+    O = (U[:, :k_act] * scale[None, :].type_as(U)) @ Vh[:k_act, :]
+
+    # SAV state update for next step
+    T = ((1.0 - sav_smooth) * r_new.square()
+         + sav_smooth * r[:k_act].square()
+         + (1.0 - sav_smooth) * (r_new - r[:k_act]).square()).clamp(min=0.0)
+    denom = sqrt_loss - r_new + eps
+    chi = ((sqrt_loss - T.sqrt()) / denom).clamp(0.0, 1.0)
+    r[:k_act].copy_(chi * r_new + (1.0 - chi) * sqrt_loss)
+
+    # SpecMuon Algorithm 1 line 22: use remaining singular values.
+    # If you want matrix-sign/Muon behavior instead, remove the S_rest factor.
+    if k_act < S.shape[-1]:
+        S_rest = S[k_act:]
+        O.add_((U[:, k_act:] * S_rest[None, :].type_as(U)) @ Vh[k_act:, :])
+
+    return O
+
+def specmuon_update(grad, momentum, r, loss, lr, mu=0.95, top_k=8, sav_smooth=0.2, eps=1e-8):
+    """SpecMuon update from Algorithm 1.
+
+    Order differs from the original Muon helper: SVD/SAV constructs O from the raw
+    normalized gradient first, then momentum is applied as B_t = mu * B_{t-1} + O_t.
+    """
+    grad = grad.float()
+    sqrt_loss = loss.detach().float().sqrt()
+
+    G_hat = grad / (torch.linalg.norm(grad) + eps)
+    U, S, Vh = torch.linalg.svd(G_hat, full_matrices=False, driver="gesvd")
+
+    # Keep singular values in fp32 for SAV scalar math; use bf16 factors for the reconstruction matmuls.
+    O = specmuon_reconstruct(U.bfloat16(), S, Vh.bfloat16(), r, sqrt_loss, lr, eps, sav_smooth, top_k)
+
+    # Preserve the simple track's shape-scaling heuristic from the original Muon baseline.
+    O = O.float().mul_(max(1, grad.size(-2) / grad.size(-1))**0.5)
+
+    momentum.mul_(mu).add_(O)
+    return momentum
 
 class Muon(torch.optim.Optimizer):
-    def __init__(self, params, lr=0.02, weight_decay=0, mu=0.95):
+    def __init__(self, params, lr=0.02, weight_decay=0, mu=0.95, top_k=8, sav_smooth=0.2, eps=1e-8):
         assert isinstance(params, list) and len(params) >= 1 and isinstance(params[0], torch.nn.Parameter)
         params = sorted(params, key=lambda x: x.size(), reverse=True)
-        defaults = dict(lr=lr, weight_decay=weight_decay, mu=mu)
+        defaults = dict(lr=lr, weight_decay=weight_decay, mu=mu, top_k=top_k, sav_smooth=sav_smooth, eps=eps)
         super().__init__(params, defaults)
 
     @torch.no_grad()
-    def step(self):
+    def step(self, loss: Tensor):
         world_size = dist.get_world_size()
         rank = dist.get_rank()
         for group in self.param_groups:
@@ -206,8 +254,16 @@ class Muon(torch.optim.Optimizer):
                     p = params[base_i + rank]
                     state = self.state[p]
                     if len(state) == 0:
-                        state["momentum"] = torch.zeros_like(p)
-                    update = muon_update(p.grad, state["momentum"], mu=group["mu"])
+                        state["step"] = 0
+                        state["momentum"] = torch.zeros_like(p, dtype=torch.float32)
+                        k_act = min(group["top_k"], min(p.shape[-2], p.shape[-1]))
+                        state["r"] = torch.zeros(k_act, dtype=torch.float32, device=p.device)
+                    if state["step"] == 0:
+                        state["r"].copy_(loss.detach().float().sqrt().expand_as(state["r"]))
+                    state["step"] += 1
+                    update = specmuon_update(p.grad, state["momentum"], state["r"], loss, group["lr"],
+                                             mu=group["mu"], top_k=group["top_k"],
+                                             sav_smooth=group["sav_smooth"], eps=group["eps"])
                     p.mul_(1 - group["lr"] * group["weight_decay"])
                     p.add_(update, alpha=-group["lr"])
                 dist.all_gather(params_pad[base_i:base_i + world_size], params_pad[base_i + rank])
@@ -355,15 +411,23 @@ for _ in range(num_trials):
         inputs, targets = next(train_loader)
         # accumulate across microbatches in case we are running with fewer than 8 gpus
         assert len(inputs) % mbs == 0
+        train_loss = torch.zeros((), device="cuda")
         for i in range(len(inputs) // mbs):
-            model(inputs[i*mbs:(i+1)*mbs], targets[i*mbs:(i+1)*mbs]).backward()
+            loss = model(inputs[i*mbs:(i+1)*mbs], targets[i*mbs:(i+1)*mbs])
+            train_loss += loss.detach()
+            loss.backward()
+        dist.all_reduce(train_loss, op=dist.ReduceOp.SUM)
+        train_loss /= batch_size
         for name, p in model.named_parameters():
             assert p.grad is not None, name
             dist.all_reduce(p.grad, op=dist.ReduceOp.SUM)
         # set optimization hyperparameters and take a step
         set_hparams(step)
         for opt in optimizers:
-            opt.step()
+            if isinstance(opt, Muon):
+                opt.step(train_loss)
+            else:
+                opt.step()
         model.zero_grad(set_to_none=True)
         approx_training_time = training_time + (time.perf_counter() - t0)
         print0(f"step:{step+1}/{train_steps} train_time:{approx_training_time:.3f}s"
