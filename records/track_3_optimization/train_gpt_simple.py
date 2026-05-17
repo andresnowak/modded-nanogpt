@@ -215,7 +215,7 @@ def specmuon_reconstruct(U, S, Vh, r, sqrt_loss, lr, eps: float, sav_smooth: flo
     return O
 
 def specmuon_update(grad, momentum, r, loss, lr, mu=0.95, top_k=8, sav_smooth=0.2, eps=1e-8):
-    """SpecMuon update from Algorithm 1.
+    """SpecMuon update from https://arxiv.org/abs/2602.16167.
 
     Order differs from the original Muon helper: SVD/SAV constructs O from the raw
     normalized gradient first, then momentum is applied as B_t = mu * B_{t-1} + O_t.
